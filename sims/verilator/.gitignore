@@ -4,3 +4,6 @@
 !verilator.mk
 !dramsim2_ini
 !bootrom
+!simple.mk
+!SimpleSim.cpp
+!SimpleTestDriver.v
