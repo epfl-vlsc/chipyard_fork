@@ -12,7 +12,7 @@ module Main(
 
     logic reset = 1'b0;
 
-    logic [63:0] cycle_counter = '0;
+    logic [63:0] cycle_counter = 0;
 
     logic verbose = 1'b0;
     wire printf_cond = verbose && !reset;
@@ -31,7 +31,7 @@ module Main(
     always_ff @(posedge clk) reset <= (cycle_counter < `RESET_DELAY);
     always_ff @(posedge clk) begin
 
-        cycle_counter <= cycle_counter + '1;
+        cycle_counter <= cycle_counter + 1;
         if (cycle_counter == max_cycles) begin
             $display("@%d: Timed out!", cycle_counter);
             $finish;
