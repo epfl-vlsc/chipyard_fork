@@ -129,7 +129,7 @@ class BaseRocketTorus2DConfig(nX: Int, nY: Int) extends Config(
         constellation.protocol.TLNoCParams(
             nodeMappings = constellation.protocol.DiplomaticNetworkNodeMapping(
                 inNodeMapping = ListMap.from(List.tabulate(nX * nY){
-                    i => (s"Core $i" -> i)
+                    i => (s"Core $i " -> i)
                 } :+ ("serial-tl" -> (nX * nY))),
                 outNodeMapping = ListMap(
                     "system[0]" -> (nX * nY - 1), // L2 bank
