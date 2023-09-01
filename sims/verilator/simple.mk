@@ -27,7 +27,7 @@ sim_name = verilator
 sim_prefix = simulator
 sim = $(sim_dir)/$(sim_prefix)-$(MODEL_PACKAGE)-$(CONFIG)
 sim_debug = $(sim_dir)/$(sim_prefix)-$(MODEL_PACKAGE)-$(CONFIG)-debug
-sim_source_tarball = $(sim_dir)/$(sim_prefix)-$(MODEL_PACKAGE)-$(CONFIG).source.tar.gz
+sim_source_tarball = $(sim_dir)/$(CONFIG)_sources.tar.gz
 
 # include $(base_dir)/sims/common-sim-flags.mk
 
@@ -186,6 +186,7 @@ $(sim_source_tarball): $(sim_common_files)
 	tar -T $(sim_common_files)  -czf $@
 
 source_tar: $(sim_source_tarball)
+
 #########################################################################################
 # create a verilator vpd rule
 #########################################################################################
