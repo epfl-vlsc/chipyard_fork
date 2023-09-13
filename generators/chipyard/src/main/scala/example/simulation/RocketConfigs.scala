@@ -22,6 +22,22 @@ import constellation.routing.BidirectionalTorus1DShortestRouting
 import constellation.topology.TerminalRouter
 import constellation.topology.BidirectionalTorus2D
 import constellation.routing.DimensionOrderedBidirectionalTorus2DDatelineRouting
+import constellation.router.UserRouterParams
+import constellation.channel.FlowParams
+import constellation.topology.Mesh2D
+import constellation.routing.TerminalRouterRouting
+import constellation.routing.Mesh2DEscapeRouting
+import constellation.channel.UserIngressParams
+import constellation.channel.UserEgressParams
+import constellation.routing.EscapeChannelRouting
+import constellation.routing.Mesh2DDimensionOrderedRouting
+import constellation.routing.Mesh2DMinimalRouting
+import constellation.routing.BlockingVirtualSubnetworksRouting
+import constellation.routing.BidirectionalTorus2DDatelineRouting
+import constellation.routing.BidirectionalTorus1DDatelineRouting
+import constellation.topology.Butterfly
+import constellation.routing.ButterflyRouting
+import constellation.channel.ChannelBuffer
 
 class BaseRocketConfig extends Config(
     new freechips.rocketchip.subsystem.WithSynchronousRocketTiles ++
@@ -102,91 +118,160 @@ class BigRocket16CoreConfig extends Config(
 
 
 // only works with a single L2 bank
-class BaseRocketRingConfig(nCores: Int) extends Config(
+class WithRingConfig(nCores: Int) extends Config(
     new constellation.soc.WithSbusNoC(constellation.protocol.TLNoCParams(
         constellation.protocol.DiplomaticNetworkNodeMapping(
             inNodeMapping =  ListMap.from(List.tabulate(nCores) { i =>
-                println(s"Core $i -> $i")
-                (s"Core $i" -> i)
-            } :+ ("serial-tl" -> (nCores))),
+                (s"Core $i " -> i)
+            }),
             outNodeMapping = ListMap(
-                "system[0]" -> (nCores + 1), // L2 bank
-                "system[1]" -> (nCores + 2), // MMIO
-                "pbus" -> nCores
+                "system[0]" -> (0 max (nCores - 1)), // L2 bank
+                "system[1]" -> (0 max (nCores - 2)), // MMIO
+                "pbus" -> (0 max (nCores - 3))
             )
         ),
         constellation.noc.NoCParams(
-            topology = TerminalRouter(BidirectionalTorus1D(nCores + 3)),
-            channelParamGen = (a, b) => UserChannelParams(Seq.fill(16) { UserVirtualChannelParams(4) }),
-            routingRelation = NonblockingVirtualSubnetworksRouting(UnidirectionalTorus1DDatelineRouting(), 16, 1)
+            topology = TerminalRouter(BidirectionalTorus1D(nCores)),
+            channelParamGen = (a, b) => UserChannelParams(Seq.fill(10) { UserVirtualChannelParams(4) }),
+            routingRelation = BlockingVirtualSubnetworksRouting(
+                TerminalRouterRouting(BidirectionalTorus1DDatelineRouting()), 5, 2)
         )
     )) ++
     new MinimalSimulationConfig
 )
 
-class BaseRocketTorus2DConfig(nX: Int, nY: Int) extends Config(
+class WithTorus2DConfig(nX: Int, nY: Int) extends Config(
     new constellation.soc.WithSbusNoC(
         constellation.protocol.TLNoCParams(
             nodeMappings = constellation.protocol.DiplomaticNetworkNodeMapping(
                 inNodeMapping = ListMap.from(List.tabulate(nX * nY){
-                    i => (s"Core $i " -> i)
-                } :+ ("serial-tl" -> (nX * nY))),
+                    i => (s"Core $i " -> i) // note the white space after $i, do no remove it
+                }),
                 outNodeMapping = ListMap(
-                    "system[0]" -> (nX * nY - 1), // L2 bank
-                    "system[1]" -> (nX * nY - 1), // MMIO
-                    "pbus" -> (nX * nY - 1)
+                    "system[0]" -> (0 max (nX * nY - 1)), // L2 bank
+                    "system[1]" -> (0 max (nX * nY - 2)), // MMIO
+                    "pbus" -> (0 max (nX * nY - 3))
                 )
             ),
             nocParams = constellation.noc.NoCParams(
-                topology = BidirectionalTorus2D(nX, nY),
+                topology = TerminalRouter(BidirectionalTorus2D(nX, nY)),
                 channelParamGen = (_, _) => UserChannelParams(Seq.fill(10) { UserVirtualChannelParams(4) }),
-                routingRelation = NonblockingVirtualSubnetworksRouting(DimensionOrderedBidirectionalTorus2DDatelineRouting(), 5, 2)
+                routingRelation = BlockingVirtualSubnetworksRouting(
+                    TerminalRouterRouting(DimensionOrderedBidirectionalTorus2DDatelineRouting()),
+                    5,
+                    2
+                )
             )
         )
     ) ++
     new MinimalSimulationConfig
 )
 
-// class SbusRingNoCConfig extends Config(
-//   new constellation.soc.WithSbusNoC(constellation.protocol.TLNoCParams(
-//     constellation.protocol.DiplomaticNetworkNodeMapping(
-//       inNodeMapping = ListMap(
-//         "Core 0" -> 0,
-//         "Core 1" -> 1,
-//         "Core 2" -> 2,
-//         "Core 3" -> 3,
-//         "Core 4" -> 4,
-//         "Core 5" -> 5,
-//         "Core 6" -> 6,
-//         "Core 7" -> 7,
-//         "serial-tl" -> 8),
-//       outNodeMapping = ListMap(
-//         "system[0]" -> 9,  // ExtMem
-//         "system[1]" -> 10, // MMIO
-//         // "system[2]" -> 11,
-//         // "system[3]" -> 12,
-//         // "system[4]" -> 13, // MMIO
-//         "pbus" -> 8)), // TSI is on the pbus, so serial-tl and pbus should be on the same node
-//     NoCParams(
-//       topology        = UnidirectionalTorus1D(11),
-//       channelParamGen = (a, b) => UserChannelParams(Seq.fill(10) { UserVirtualChannelParams(4) }),
-//       routingRelation = NonblockingVirtualSubnetworksRouting(UnidirectionalTorus1DDatelineRouting(), 5, 2))
-//   )) ++
-//   new freechips.rocketchip.subsystem.WithNBigCores(8) ++
-//   new freechips.rocketchip.subsystem.WithNBanks(1) ++
-//   new MinimalSimulationConfig
-// )
+class WithMesh2DNoC(nX: Int, nY: Int) extends Config(
+    new constellation.soc.WithSbusNoC(
+        constellation.protocol.TLNoCParams(
+           nodeMappings = constellation.protocol.DiplomaticNetworkNodeMapping(
+                inNodeMapping = ListMap.from(List.tabulate(nX * nY){
+                    i => (s"Core $i " -> i)
+                }),
+                outNodeMapping = ListMap(
+                    "system[0]" -> (0 max (nX * nY - 1)), // Memory
+                    "system[1]" -> (0 max (nX * nY - 2)), // MMIO
+                    "pbus" -> (0 max (nX * nY - 3))
+                )
+            ),
+            nocParams = constellation.noc.NoCParams(
+                topology = TerminalRouter(Mesh2D(nX, nY)),
+                channelParamGen = (_, _) => UserChannelParams(
+                    virtualChannelParams = Seq.fill(5) {
+                        UserVirtualChannelParams(4)
+                    },
+                    channelGen = (u) => {
+                        implicit val p: Parameters = u
+                        ChannelBuffer(4) := _
+                    }
+                ),
+                routingRelation = BlockingVirtualSubnetworksRouting(
+                    f = TerminalRouterRouting(
+                        Mesh2DEscapeRouting()
+                    ),
+                    n = 5, // RADDR, RDATA, WADDR, WRESP, WDATA
+                    nDedicated = 1
+                ),
+                skipValidationChecks = false,
+            )
+        )
+    ) ++
+    new MinimalSimulationConfig
+)
+
+class WithButterflyNoC(kAry: Int, nFly: Int) extends Config ({
+    val butterfly = Butterfly(kAry, nFly)
+    val nCores = butterfly.nNodes
+    new constellation.soc.WithSbusNoC(
+        constellation.protocol.TLNoCParams(
+           nodeMappings = constellation.protocol.DiplomaticNetworkNodeMapping(
+                inNodeMapping = ListMap.from(List.tabulate(nCores){
+                    i => (s"Core $i " -> i)
+                }),
+                outNodeMapping = ListMap(
+                    "system[0]" -> (0 max (nCores - 1)), // Memory
+                    "system[1]" -> (0 max (nCores - 2)), // MMIO
+                    "pbus" -> (0 max (nCores - 3))
+                )
+            ),
+            nocParams = constellation.noc.NoCParams(
+                topology = TerminalRouter(butterfly),
+                channelParamGen = (_, _) => UserChannelParams(Seq.fill(15) { UserVirtualChannelParams(4) }),
+                routingRelation = BlockingVirtualSubnetworksRouting(
+                    f = TerminalRouterRouting(
+                        ButterflyRouting()
+                    ),
+                    n = 5, // RADDR, RDATA, WADDR, WRESP, WDATA
+                    nDedicated = 3
+                ),
+                skipValidationChecks = false,
+            )
+        )
+    ) ++
+    new MinimalSimulationConfig
+})
+
+class AnySmallRocketBusConfig(nCores: Int) extends Config(
+    new freechips.rocketchip.subsystem.WithNSmallCores(n = nCores) ++
+    new freechips.rocketchip.subsystem.WithNBanks(n = 1) ++
+    new MinimalSimulationConfig
+)
 
 class AnySmallRocketRingConfig(nCores: Int) extends Config(
     new freechips.rocketchip.subsystem.WithNSmallCores(n = nCores) ++
     new freechips.rocketchip.subsystem.WithNBanks(n = 1) ++
-    new BaseRocketRingConfig(nCores)
+    new WithRingConfig(nCores)
 )
 class AnySmallRocketTorusConfig(nX: Int, nY: Int) extends Config(
+    new freechips.rocketchip.subsystem.WithNSmallCores(n = nX * nY - 1) ++
+    new freechips.rocketchip.subsystem.WithNBanks(n = 1) ++
+    new WithTorus2DConfig(nX, nY)
+)
+
+class AnySmallRocketMeshConfig(nX: Int, nY: Int) extends Config(
     new freechips.rocketchip.subsystem.WithNSmallCores(n = nX * nY) ++
     new freechips.rocketchip.subsystem.WithNBanks(n = 1) ++
-    new BaseRocketTorus2DConfig(nX, nY)
+    new WithMesh2DNoC(nX, nY)
 )
+
+class AnySmallRocketButterflyConfig(kAry: Int, nFly: Int) extends Config(
+    new freechips.rocketchip.subsystem.WithNSmallCores(
+            n = scala.math.pow(kAry, nFly).toInt) ++
+    new freechips.rocketchip.subsystem.WithNBanks(n = 1) ++
+    new WithButterflyNoC(kAry, nFly)
+)
+
+
+
+class SmallRocket1CoreBusConfig extends AnySmallRocketBusConfig(1)
+class SmallRocket2CoreBusConfig extends AnySmallRocketBusConfig(2)
+class SmallRocket4CoreBusConfig extends AnySmallRocketBusConfig(4)
 
 class SmallRocket1CoreRingConfig extends AnySmallRocketRingConfig(1)
 class SmallRocket2CoreRingConfig extends AnySmallRocketRingConfig(2)
@@ -194,22 +279,45 @@ class SmallRocket4CoreRingConfig extends AnySmallRocketRingConfig(4)
 class SmallRocket8CoreRingConfig extends AnySmallRocketRingConfig(8)
 class SmallRocket16CoreRingConfig extends AnySmallRocketRingConfig(16)
 class SmallRocket32CoreRingConfig extends AnySmallRocketRingConfig(32)
+class SmallRocket64CoreRingConfig extends AnySmallRocketRingConfig(64)
+class SmallROcket128CoreRingConfig extends AnySmallRocketRingConfig(128)
 
 
+class SmallRocket1x1CoreTorusConfig extends AnySmallRocketTorusConfig(1, 1)
 class SmallRocket2x2CoreTorusConfig extends AnySmallRocketTorusConfig(2, 2)
 class SmallRocket3x3CoreTorusConfig extends AnySmallRocketTorusConfig(3, 3)
 class SmallRocket4x4CoreTorusConfig extends AnySmallRocketTorusConfig(4, 4)
 class SmallRocket5x5CoreTorusConfig extends AnySmallRocketTorusConfig(5, 5)
 class SmallRocket6x6CoreTorusConfig extends AnySmallRocketTorusConfig(6, 6)
-// abstract class AnySmallRocketRingConfig(nCores:Int, nBanks: Int = 1) extends Config(
-//     new freechips.rocketchip.subsystem.WithNSmallCores(n = nCores) ++
-//     new freechips.rocketchip.subsystem.WithNBanks(n = nBanks) ++
-//     new testchipip.WithRingSystemBus ++
-//     new BaseRocketConfig
-// )
-
-// class SmallRocket2CoreRingConfig extends AnySmallRocketRingConfig(2, 1)
-// class SmallRocket4CoreRingConfig extends AnySmallRocketRingConfig(4, 2)
-// class SmallRocket8CoreRingConfig extends AnySmallRocketRingConfig(8, 4)
+class SmallRocket7x7CoreTorusConfig extends AnySmallRocketTorusConfig(7, 7)
+class SmallRocket8x8CoreTorusConfig extends AnySmallRocketTorusConfig(8, 8)
+class SmallRocket9x9CoreTorusConfig extends AnySmallRocketTorusConfig(9, 9)
+class SmallRocket10x10CoreTorusConfig extends AnySmallRocketTorusConfig(10, 10)
+class SmallRocket11x11CoreTorusConfig extends AnySmallRocketTorusConfig(11, 11)
+class SmallRocket12x12CoreTorusConfig extends AnySmallRocketTorusConfig(12, 12)
 
 
+
+class SmallRocket1x1CoreMeshConfig extends AnySmallRocketMeshConfig(1, 1)
+class SmallRocket2x2CoreMeshConfig extends AnySmallRocketMeshConfig(2, 2)
+class SmallRocket3x3CoreMeshConfig extends AnySmallRocketMeshConfig(3, 3)
+class SmallRocket4x4CoreMeshConfig extends AnySmallRocketMeshConfig(4, 4)
+class SmallRocket5x5CoreMeshConfig extends AnySmallRocketMeshConfig(5, 5)
+class SmallRocket6x6CoreMeshConfig extends AnySmallRocketMeshConfig(6, 6)
+class SmallRocket7x7CoreMeshConfig extends AnySmallRocketMeshConfig(7, 7)
+class SmallRocket8x8CoreMeshConfig extends AnySmallRocketMeshConfig(8, 8)
+class SmallRocket9x9CoreMeshConfig extends AnySmallRocketMeshConfig(9, 9)
+class SmallRocket10x10CoreMeshConfig extends AnySmallRocketMeshConfig(10, 10)
+class SmallRocket11x11CoreMeshConfig extends AnySmallRocketMeshConfig(11, 11)
+class SmallRocket12x12CoreMeshConfig extends AnySmallRocketMeshConfig(12, 12)
+
+// class SmallRocket2Ary0FlyCoreButterflyConfig extends AnySmallRocketButterflyConfig(2, 0)
+// class SmallRocket2Ary1FlyCoreButterflyConfig extends AnySmallRocketButterflyConfig(2, 1)
+
+class SmallRocket2Ary2FlyCoreButterflyConfig extends AnySmallRocketButterflyConfig(2, 2)
+class SmallRocket2Ary3FlyCoreButterflyConfig extends AnySmallRocketButterflyConfig(2, 3)
+class SmallRocket2Ary4FlyCoreButterflyConfig extends AnySmallRocketButterflyConfig(2, 4)
+class SmallRocket2Ary5FlyCoreButterflyConfig extends AnySmallRocketButterflyConfig(2, 5)
+class SmallRocket2Ary6FlyCoreButterflyConfig extends AnySmallRocketButterflyConfig(2, 6)
+class SmallRocket2Ary7FlyCoreButterflyConfig extends AnySmallRocketButterflyConfig(2, 7)
+class SmallRocket2Ary8FlyCoreButterflyConfig extends AnySmallRocketButterflyConfig(2, 8)

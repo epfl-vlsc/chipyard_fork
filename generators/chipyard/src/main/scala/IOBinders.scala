@@ -27,6 +27,7 @@ import icenet.{CanHavePeripheryIceNIC, SimNetwork, NicLoopback, NICKey, NICIOvon
 import chipyard.{CanHaveMasterTLMemPort}
 
 import scala.reflect.{ClassTag}
+import chipyard.CanHaveCustomMasterTLMMIOPort
 
 object IOBinderTypes {
   type IOBinderTuple = (Seq[Data], Seq[IOCell])
@@ -415,6 +416,13 @@ class WithTLMemPunchthrough extends OverrideIOBinder({
   (system: CanHaveMasterTLMemPort) => {
     val io_tl_mem_pins_temp = IO(DataMirror.internal.chiselTypeClone[HeterogeneousBag[TLBundle]](system.mem_tl)).suggestName("tl_slave")
     io_tl_mem_pins_temp <> system.mem_tl
+    (Seq(io_tl_mem_pins_temp), Nil)
+  }
+})
+class WithTLMMIOPunchthrough extends OverrideIOBinder({
+  (system: CanHaveCustomMasterTLMMIOPort) => {
+    val io_tl_mem_pins_temp = IO(DataMirror.internal.chiselTypeClone[HeterogeneousBag[TLBundle]](system.mmio_tl)).suggestName("tl_mmio_slave")
+    io_tl_mem_pins_temp <> system.mmio_tl
     (Seq(io_tl_mem_pins_temp), Nil)
   }
 })

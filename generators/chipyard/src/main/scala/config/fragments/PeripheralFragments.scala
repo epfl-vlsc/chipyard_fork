@@ -18,6 +18,7 @@ import sifive.blocks.devices.spi._
 import testchipip._
 
 import chipyard.{ExtTLMem}
+import chipyard.ExtTLBus
 
 // Set the bootrom to the Chipyard bootrom
 class WithBootROM extends Config((site, here, up) => {
@@ -62,6 +63,11 @@ class WithNoDebug extends Config((site, here, up) => {
 class WithTLBackingMemory extends Config((site, here, up) => {
   case ExtMem => None // disable AXI backing memory
   case ExtTLMem => up(ExtMem, site) // enable TL backing memory
+})
+
+class WithTLBackingMMIO extends Config((site, here, up) => {
+    case ExtBus => None
+    case ExtTLBus => up(ExtBus, site)
 })
 
 class WithExtMemIdBits(n: Int) extends Config((site, here, up) => {

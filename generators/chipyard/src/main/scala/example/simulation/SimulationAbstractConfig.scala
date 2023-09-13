@@ -12,6 +12,10 @@ import chipyard.harness.OverrideHarnessBinder
 import freechips.rocketchip.system.{SimAXIMem}
 import example.simulation.WithSimAXIMemHexPlusArgs
 import example.simulation.WithSimAXIMMIOToHostSnooper
+import example.simulation.WithSimTLMemHexPlusArgs
+import example.simulation.WithSimTLMMIOToHostSnooper
+import chipyard.config.WithTLBackingMemory
+import chipyard.config.WithTLBackingMMIO
 
 // Option to look up the bootrom from a different directory
 class WithBootROMPrefixPath(prefixPath: String) extends Config((site, here, up) => {
@@ -100,8 +104,10 @@ class MinimalSimulationConfig(freqMHz: Double = 1000.0, extMemSize: Int = 0x2000
   // The HarnessBinders control generation of hardware in the TestHarness
   new freechips.rocketchip.subsystem.WithSynchronousRocketTiles ++
   new WithBootROMPrefixPath("sims/verilator/bootrom") ++
-  new WithSimAXIMemHexPlusArgs ++
-  new WithSimAXIMMIOToHostSnooper ++
+  new WithSimTLMemHexPlusArgs ++
+  new WithSimTLMMIOToHostSnooper ++
+  new WithTLBackingMemory ++
+  new WithTLBackingMMIO ++
   new freechips.rocketchip.subsystem.WithExtMemSize(extMemSize) ++
   // disable unnecessary stuff
   new chipyard.config.WithNoDebug ++
@@ -121,6 +127,7 @@ class MinimalSimulationConfig(freqMHz: Double = 1000.0, extMemSize: Int = 0x2000
   new chipyard.iobinders.WithAXI4MemPunchthrough ++
   new chipyard.iobinders.WithAXI4MMIOPunchthrough ++
   new chipyard.iobinders.WithTLMemPunchthrough ++
+  new chipyard.iobinders.WithTLMMIOPunchthrough ++
   new chipyard.iobinders.WithL2FBusAXI4Punchthrough ++
   new chipyard.iobinders.WithSerialTLIOCells ++
   new chipyard.iobinders.WithDebugIOCells ++

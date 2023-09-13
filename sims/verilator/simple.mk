@@ -38,7 +38,8 @@ else
 SEED_FLAG=
 endif
 
-.PHONY: default debug
+.PHONY: default debug source_tar
+
 default: $(sim)
 debug: $(sim_debug)
 
@@ -184,6 +185,7 @@ $(sim_debug): $(model_mk_debug) $(dramsim_lib)
 
 $(sim_source_tarball): $(sim_common_files)
 	tar -T $(sim_common_files)  -czf $@
+
 
 source_tar: $(sim_source_tarball)
 
