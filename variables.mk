@@ -4,7 +4,7 @@
 #   prints all the HELP_LINES
 #########################################################################################
 HELP_COMPILATION_VARIABLES = \
-"   JAVA_HEAP_SIZE    = if overridden, set the default java heap size (default is 8G)" \
+"   JAVA_HEAP_SIZE    = if overridden, set the default java heap size (default is 32G)" \
 "   JAVA_TOOL_OPTIONS = if overridden, set underlying java tool options (default sets misc. sizes and tmp dir)" \
 "   SBT_OPTS          = set additional sbt command line options (these take the form -Dsbt.<option>=<setting>) " \
 "                       See https://www.scala-sbt.org/1.x/docs/Command-Line-Reference.html\#Command+Line+Options" \
@@ -228,7 +228,7 @@ MFC_LOWERING_OPTIONS ?= $(build_dir)/.mfc_lowering_options
 #########################################################################################
 # java arguments used in sbt
 #########################################################################################
-JAVA_HEAP_SIZE ?= 8G
+JAVA_HEAP_SIZE ?= 32G
 JAVA_TMP_DIR ?= $(base_dir)/.java_tmp
 export JAVA_TOOL_OPTIONS ?= -Xmx$(JAVA_HEAP_SIZE) -Xss8M -Djava.io.tmpdir=$(JAVA_TMP_DIR)
 

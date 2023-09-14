@@ -61,27 +61,6 @@ class SmallRocket8CoreConfig extends AnySmallRocketConfig(8)
 class SmallRocket16CoreConfig extends AnySmallRocketConfig(16)
 
 
-class GemminiCustomChipConfig[T <: Data : Arithmetic, U <: Data, V <: Data](
-    gemminiConfig: GemminiArrayConfig[T, U, V] = GemminiConfigs.chipConfig
-) extends Config((site, here, up) => {
-    case BuildRoCC => up(BuildRoCC) ++ Seq(
-        (p: Parameters) => {
-            implicit val q = p
-            val gemmini = LazyModule(new Gemmini(gemminiConfig))
-            gemmini
-        }
-    )
-})
-
-abstract class AnySmallRocketWithGemmmini(n: Int) extends Config (
-    new GemminiCustomChipConfig ++
-    new freechips.rocketchip.subsystem.WithNSmallCores(n = n) ++
-    new BaseRocketConfig
-)
-
-
-class SmallRocketWithGemmmini1CoreConfig extends AnySmallRocketWithGemmmini(1)
-class SmallRocketWithGemmmini2CoreConfig extends AnySmallRocketWithGemmmini(2)
 
 
 class MediumRocket1CoreConfig extends Config(
@@ -125,13 +104,13 @@ class WithRingConfig(nCores: Int) extends Config(
                 (s"Core $i " -> i)
             }),
             outNodeMapping = ListMap(
-                "system[0]" -> (0 max (nCores - 1)), // L2 bank
-                "system[1]" -> (0 max (nCores - 2)), // MMIO
-                "pbus" -> (0 max (nCores - 3))
+                "system[0]" -> (0 max (nCores)), // L2 bank
+                "system[1]" -> (0 max (nCores + 1)), // MMIO
+                "pbus" -> (0 max (nCores + 2))
             )
         ),
         constellation.noc.NoCParams(
-            topology = TerminalRouter(BidirectionalTorus1D(nCores)),
+            topology = TerminalRouter(UnidirectionalTorus1D(nCores + 3)),
             channelParamGen = (a, b) => UserChannelParams(Seq.fill(10) { UserVirtualChannelParams(4) }),
             routingRelation = BlockingVirtualSubnetworksRouting(
                 TerminalRouterRouting(BidirectionalTorus1DDatelineRouting()), 5, 2)
@@ -144,7 +123,7 @@ class WithTorus2DConfig(nX: Int, nY: Int) extends Config(
     new constellation.soc.WithSbusNoC(
         constellation.protocol.TLNoCParams(
             nodeMappings = constellation.protocol.DiplomaticNetworkNodeMapping(
-                inNodeMapping = ListMap.from(List.tabulate(nX * nY){
+                inNodeMapping = ListMap.from(List.tabulate(nX * nY - 3){
                     i => (s"Core $i " -> i) // note the white space after $i, do no remove it
                 }),
                 outNodeMapping = ListMap(
@@ -168,10 +147,12 @@ class WithTorus2DConfig(nX: Int, nY: Int) extends Config(
 )
 
 class WithMesh2DNoC(nX: Int, nY: Int) extends Config(
-    new constellation.soc.WithSbusNoC(
+    new constellation.soc.WithSbusNoC({
+        require(nX * nY >= 4, "Mesh is too small!")
+
         constellation.protocol.TLNoCParams(
            nodeMappings = constellation.protocol.DiplomaticNetworkNodeMapping(
-                inNodeMapping = ListMap.from(List.tabulate(nX * nY){
+                inNodeMapping = ListMap.from(List.tabulate(nX * nY - 3){
                     i => (s"Core $i " -> i)
                 }),
                 outNodeMapping = ListMap(
@@ -189,25 +170,32 @@ class WithMesh2DNoC(nX: Int, nY: Int) extends Config(
                     channelGen = (u) => {
                         implicit val p: Parameters = u
                         ChannelBuffer(4) := _
-                    }
+                    },
+                    useOutputQueues = true // prevent long comb paths between terminal routers
                 ),
                 routingRelation = BlockingVirtualSubnetworksRouting(
                     f = TerminalRouterRouting(
-                        Mesh2DEscapeRouting()
+                        Mesh2DDimensionOrderedRouting()
                     ),
-                    n = 5, // RADDR, RDATA, WADDR, WRESP, WDATA
+                    n = 5, // RADDR, RDATA, WADDR, WRESP, WDATA for AXI and A-B-C-D-E for TL
                     nDedicated = 1
+                ),
+                routerParams = _ => UserRouterParams(
+                    payloadBits = 64,
+                    combineSAST = false,
+                    combineRCVA = false,
+                    coupleSAVA = false,
                 ),
                 skipValidationChecks = false,
             )
         )
-    ) ++
+    }) ++
     new MinimalSimulationConfig
 )
 
 class WithButterflyNoC(kAry: Int, nFly: Int) extends Config ({
     val butterfly = Butterfly(kAry, nFly)
-    val nCores = butterfly.nNodes
+    val nCores = butterfly.nNodes - 3
     new constellation.soc.WithSbusNoC(
         constellation.protocol.TLNoCParams(
            nodeMappings = constellation.protocol.DiplomaticNetworkNodeMapping(
@@ -249,13 +237,13 @@ class AnySmallRocketRingConfig(nCores: Int) extends Config(
     new WithRingConfig(nCores)
 )
 class AnySmallRocketTorusConfig(nX: Int, nY: Int) extends Config(
-    new freechips.rocketchip.subsystem.WithNSmallCores(n = nX * nY - 1) ++
+    new freechips.rocketchip.subsystem.WithNSmallCores(n = nX * nY - 3) ++
     new freechips.rocketchip.subsystem.WithNBanks(n = 1) ++
     new WithTorus2DConfig(nX, nY)
 )
 
 class AnySmallRocketMeshConfig(nX: Int, nY: Int) extends Config(
-    new freechips.rocketchip.subsystem.WithNSmallCores(n = nX * nY) ++
+    new freechips.rocketchip.subsystem.WithNSmallCores(n = nX * nY - 3) ++
     new freechips.rocketchip.subsystem.WithNBanks(n = 1) ++
     new WithMesh2DNoC(nX, nY)
 )
@@ -272,6 +260,14 @@ class AnySmallRocketButterflyConfig(kAry: Int, nFly: Int) extends Config(
 class SmallRocket1CoreBusConfig extends AnySmallRocketBusConfig(1)
 class SmallRocket2CoreBusConfig extends AnySmallRocketBusConfig(2)
 class SmallRocket4CoreBusConfig extends AnySmallRocketBusConfig(4)
+class SmallRocket8CoreBusConfig extends AnySmallRocketBusConfig(8)
+class SmallRocket16CoreBusConfig extends AnySmallRocketBusConfig(16)
+class SmallRocket32CoreBusConfig extends AnySmallRocketBusConfig(32)
+class SmallRocket64CoreBusConfig extends AnySmallRocketBusConfig(64)
+class SmallRocket128CoreBusConfig extends AnySmallRocketBusConfig(128)
+
+
+
 
 class SmallRocket1CoreRingConfig extends AnySmallRocketRingConfig(1)
 class SmallRocket2CoreRingConfig extends AnySmallRocketRingConfig(2)
@@ -321,3 +317,32 @@ class SmallRocket2Ary5FlyCoreButterflyConfig extends AnySmallRocketButterflyConf
 class SmallRocket2Ary6FlyCoreButterflyConfig extends AnySmallRocketButterflyConfig(2, 6)
 class SmallRocket2Ary7FlyCoreButterflyConfig extends AnySmallRocketButterflyConfig(2, 7)
 class SmallRocket2Ary8FlyCoreButterflyConfig extends AnySmallRocketButterflyConfig(2, 8)
+
+
+class GemminiCustomChipConfig[T <: Data : Arithmetic, U <: Data, V <: Data](
+    gemminiConfig: GemminiArrayConfig[T, U, V] = GemminiConfigs.chipConfig
+) extends Config((site, here, up) => {
+    case BuildRoCC => up(BuildRoCC) ++ Seq(
+        (p: Parameters) => {
+            implicit val q = p
+            val gemmini = LazyModule(new Gemmini(gemminiConfig))
+            gemmini
+        }
+    )
+})
+
+abstract class AnySmallRocketWithGemmini(n: Int) extends Config (
+    new GemminiCustomChipConfig ++
+    new freechips.rocketchip.subsystem.WithNSmallCores(n = n) ++
+    new MinimalSimulationConfig
+)
+
+
+class SmallRocketWithGemmini1CoreBusConfig extends AnySmallRocketWithGemmini(1)
+class SmallRocketWithGemmini2CoreBusConfig extends AnySmallRocketWithGemmini(2)
+class SmallRocketWithGemmini4CoreBusConfig extends AnySmallRocketWithGemmini(4)
+class SmallRocketWithGemmini8CoreBusConfig extends AnySmallRocketWithGemmini(8)
+class SmallRocketWithGemmini16CoreBusConfig extends AnySmallRocketWithGemmini(16)
+class SmallRocketWithGemmini32CoreBusConfig extends AnySmallRocketWithGemmini(32)
+class SmallRocketWithGemmini64CoreBusConfig extends AnySmallRocketWithGemmini(64)
+class SmallRocketWithGemmini128CoreBusConfig extends AnySmallRocketWithGemmini(128)

@@ -403,7 +403,7 @@ class SimMMIOToHostSnooper(toHostOffset: Int, lanes: Int, bits: Int, size: Int) 
             |         wdata_q <= wdata;
             |       end
             |   end
-            |
+            |`ifndef SYNTHESIS
             |   always_ff @(posedge clock) begin
             |          if (wen_q && wstrb_q[3:0] == 4'b1111 && addr_q == OFFSET) begin
             |            if (wdata_q[31:0] != 1) begin
@@ -418,7 +418,7 @@ class SimMMIOToHostSnooper(toHostOffset: Int, lanes: Int, bits: Int, size: Int) 
             |              // $$stop;
             |          end
             |   end
-            |
+            |`endif
             |endmodule
             |
             |""".stripMargin
@@ -460,6 +460,7 @@ class SimRAMLoadHex(lanes: Int, bits: Int, size: Int) extends
             |   typedef logic [7:0][255:0] sstr_t;
             |   logic [63:0] cycle_counter = '0;
             |   always_ff @(posedge clock) cycle_counter <= cycle_counter + 1;
+            |`ifndef SYNTHESIS
             |   initial begin: load_data
             |       sstr_t filename = '0;
             |       if (!$$value$$plusargs("binary=%s", filename)) begin
@@ -468,6 +469,7 @@ class SimRAMLoadHex(lanes: Int, bits: Int, size: Int) extends
             |       end
             |       $$readmemh(filename, storage);
             |   end
+            |`endif
             |   logic [ADDR_BITS - 1 : 0] addr_q;
             |   always_ff @(posedge clock) begin
             |       if (wen) begin

@@ -219,7 +219,7 @@ $(FINAL_ANNO_FILE): $(EXTRA_ANNO_FILE) $(SFC_EXTRA_ANNO_FILE) $(SFC_LEVEL)
 	if [ $(shell cat $(SFC_LEVEL)) = low ]; then jq -s '[.[][]]' $(EXTRA_ANNO_FILE) $(SFC_EXTRA_ANNO_FILE) > $@; fi
 	if [ $(shell cat $(SFC_LEVEL)) = none ]; then cat $(EXTRA_ANNO_FILE) > $@; fi
 	touch $@
-
+# use firtool 1.30.0
 $(SFC_MFC_TARGETS) &: private TMP_DIR := $(shell mktemp -d -t cy-XXXXXXXX)
 $(SFC_MFC_TARGETS) &: $(TAPEOUT_CLASSPATH_TARGETS) $(FIRRTL_FILE) $(FINAL_ANNO_FILE) $(SFC_LEVEL) $(EXTRA_FIRRTL_OPTIONS) $(MFC_LOWERING_OPTIONS) $(CHIPYARD_VLOG_SOURCES) $(BARSTOOLS_VLOG_SOURCES)
 	rm -rf $(GEN_COLLATERAL_DIR)
@@ -251,9 +251,9 @@ $(SFC_MFC_TARGETS) &: $(TAPEOUT_CLASSPATH_TARGETS) $(FIRRTL_FILE) $(FINAL_ANNO_F
 		--lowering-options=$(shell cat $(MFC_LOWERING_OPTIONS)) \
 		--repl-seq-mem \
 		--repl-seq-mem-file=$(MFC_SMEMS_CONF) \
-		--repl-seq-mem-circuit=$(MODEL) \
 		--annotation-file=$(SFC_ANNO_FILE) \
-		--split-verilog \
+		--lowering-options=disallowLocalVariables \
+		--split-verilog  \
 		-o $(GEN_COLLATERAL_DIR) \
 		$(SFC_FIRRTL_FILE)
 	-mv $(SFC_SMEMS_CONF) $(MFC_SMEMS_CONF) 2> /dev/null
