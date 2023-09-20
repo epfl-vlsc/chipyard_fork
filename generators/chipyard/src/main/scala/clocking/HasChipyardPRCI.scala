@@ -30,18 +30,21 @@ trait HasChipyardPRCI { this: BaseSubsystem with InstantiatesTiles =>
   require(p(SubsystemDriveAsyncClockGroupsKey).isEmpty, "Subsystem asyncClockGroups must be undriven")
 
   val prciParams = p(ChipyardPRCIControlKey)
+  private val tlbus = locateTLBusWrapper(prciParams.slaveWhere)
+
 
   // Set up clock domain
-  private val tlbus = locateTLBusWrapper(prciParams.slaveWhere)
   val prci_ctrl_domain = LazyModule(new ClockSinkDomain(name=Some("chipyard-prci-control")))
   prci_ctrl_domain.clockNode := tlbus.fixedClockNode
 
   val prci_ctrl_bus = prci_ctrl_domain { TLXbar() }
-  tlbus.coupleTo("prci_ctrl") { (prci_ctrl_bus
-    := TLFIFOFixer(TLFIFOFixer.all)
-    := TLFragmenter(tlbus.beatBytes, tlbus.blockBytes)
-    := TLBuffer()
-    := _)
+  if (prciParams.enableTileClockGating || prciParams.enableTileResetSetting) {
+    tlbus.coupleTo("prci_ctrl") { (prci_ctrl_bus
+      := TLFIFOFixer(TLFIFOFixer.all)
+      := TLFragmenter(tlbus.beatBytes, tlbus.blockBytes)
+      := TLBuffer()
+      := _)
+    }
   }
 
   // Aggregate all the clock groups into a single node

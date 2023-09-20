@@ -16,6 +16,7 @@ import example.simulation.WithSimTLMemHexPlusArgs
 import example.simulation.WithSimTLMMIOToHostSnooper
 import chipyard.config.WithTLBackingMemory
 import chipyard.config.WithTLBackingMMIO
+import chipyard.clocking.ChipyardPRCIControlKey
 
 // Option to look up the bootrom from a different directory
 class WithBootROMPrefixPath(prefixPath: String) extends Config((site, here, up) => {
@@ -25,6 +26,14 @@ class WithBootROMPrefixPath(prefixPath: String) extends Config((site, here, up) 
         s"${prefixPath}/bootrom.rv${site(freechips.rocketchip.tile.XLen)}.img"))
 })
 
+class WithDisableTileClockGating extends Config((site, here, up) => {
+  case ChipyardPRCIControlKey =>
+    up(ChipyardPRCIControlKey, site).copy(enableTileClockGating = false)
+})
+class WithDisableTileResetSetter extends Config((site, here, up) => {
+  case ChipyardPRCIControlKey =>
+    up(ChipyardPRCIControlKey, site).copy(enableTileResetSetting = false)
+})
 
 class SimulationAbstractConfig(freqMHz: Double = 1000.0) extends Config(
   new WithBootROMPrefixPath("sims/verilator/bootrom") ++
@@ -109,6 +118,8 @@ class MinimalSimulationConfig(freqMHz: Double = 1000.0, extMemSize: Int = 0x2000
   new WithTLBackingMemory ++
   new WithTLBackingMMIO ++
   new freechips.rocketchip.subsystem.WithExtMemSize(extMemSize) ++
+  new WithDisableTileClockGating ++
+  new WithDisableTileResetSetter ++
   // disable unnecessary stuff
   new chipyard.config.WithNoDebug ++
   new chipyard.config.WithNoPLIC ++
