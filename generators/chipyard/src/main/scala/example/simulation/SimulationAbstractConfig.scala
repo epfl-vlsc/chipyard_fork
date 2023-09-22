@@ -17,6 +17,7 @@ import example.simulation.WithSimTLMMIOToHostSnooper
 import chipyard.config.WithTLBackingMemory
 import chipyard.config.WithTLBackingMMIO
 import chipyard.clocking.ChipyardPRCIControlKey
+import freechips.rocketchip.devices.tilelink.CLINTKey
 
 // Option to look up the bootrom from a different directory
 class WithBootROMPrefixPath(prefixPath: String) extends Config((site, here, up) => {
@@ -33,6 +34,10 @@ class WithDisableTileClockGating extends Config((site, here, up) => {
 class WithDisableTileResetSetter extends Config((site, here, up) => {
   case ChipyardPRCIControlKey =>
     up(ChipyardPRCIControlKey, site).copy(enableTileResetSetting = false)
+})
+
+class WithNoCLINT extends Config((site, here, up) => {
+  case CLINTKey => None
 })
 
 class SimulationAbstractConfig(freqMHz: Double = 1000.0) extends Config(
@@ -121,6 +126,7 @@ class MinimalSimulationConfig(freqMHz: Double = 1000.0, extMemSize: Int = 0x2000
   new WithDisableTileClockGating ++
   new WithDisableTileResetSetter ++
   // disable unnecessary stuff
+  new WithNoCLINT ++
   new chipyard.config.WithNoDebug ++
   new chipyard.config.WithNoPLIC ++
   new chipyard.config.WithNoTraceIO ++
