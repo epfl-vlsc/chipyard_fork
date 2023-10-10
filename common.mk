@@ -239,6 +239,7 @@ $(SFC_MFC_TARGETS) &: $(TAPEOUT_CLASSPATH_TARGETS) $(FIRRTL_FILE) $(FINAL_ANNO_F
 	@if [ $(shell cat $(SFC_LEVEL)) = low ]; then cat $(TMP_DIR)/unnec-anno-deleted.sfc.anno.json | jq 'del(.[] | select(.class | test("SRAMAnnotation"))?)' > $(TMP_DIR)/unnec-anno-deleted2.sfc.anno.json; fi
 	@if [ $(shell cat $(SFC_LEVEL)) = low ]; then cat $(TMP_DIR)/unnec-anno-deleted2.sfc.anno.json > $(SFC_ANNO_FILE) && rm $(TMP_DIR)/unnec-anno-deleted.sfc.anno.json && rm $(TMP_DIR)/unnec-anno-deleted2.sfc.anno.json; fi
 	firtool \
+		-O=release \
 		--format=fir \
 		--dedup \
 		--export-module-hierarchy \
@@ -252,7 +253,6 @@ $(SFC_MFC_TARGETS) &: $(TAPEOUT_CLASSPATH_TARGETS) $(FIRRTL_FILE) $(FINAL_ANNO_F
 		--repl-seq-mem \
 		--repl-seq-mem-file=$(MFC_SMEMS_CONF) \
 		--annotation-file=$(SFC_ANNO_FILE) \
-		--lowering-options=disallowLocalVariables \
 		--split-verilog  \
 		-o $(GEN_COLLATERAL_DIR) \
 		$(SFC_FIRRTL_FILE)

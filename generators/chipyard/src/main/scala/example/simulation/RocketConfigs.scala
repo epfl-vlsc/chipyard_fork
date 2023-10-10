@@ -294,7 +294,7 @@ class SmallRocket12x12CoreTorusConfig extends AnySmallRocketTorusConfig(12, 12)
 
 
 
-class SmallRocket1x1CoreMeshConfig extends AnySmallRocketMeshConfig(1, 1)
+
 class SmallRocket2x2CoreMeshConfig extends AnySmallRocketMeshConfig(2, 2)
 class SmallRocket3x3CoreMeshConfig extends AnySmallRocketMeshConfig(3, 3)
 class SmallRocket4x4CoreMeshConfig extends AnySmallRocketMeshConfig(4, 4)
@@ -306,6 +306,10 @@ class SmallRocket9x9CoreMeshConfig extends AnySmallRocketMeshConfig(9, 9)
 class SmallRocket10x10CoreMeshConfig extends AnySmallRocketMeshConfig(10, 10)
 class SmallRocket11x11CoreMeshConfig extends AnySmallRocketMeshConfig(11, 11)
 class SmallRocket12x12CoreMeshConfig extends AnySmallRocketMeshConfig(12, 12)
+class SmallRocket13x13CoreMeshConfig extends AnySmallRocketMeshConfig(13, 13)
+class SmallRocket14x14CoreMeshConfig extends AnySmallRocketMeshConfig(14, 14)
+class SmallRocket15x15CoreMeshConfig extends AnySmallRocketMeshConfig(15, 15)
+
 
 // class SmallRocket2Ary0FlyCoreButterflyConfig extends AnySmallRocketButterflyConfig(2, 0)
 // class SmallRocket2Ary1FlyCoreButterflyConfig extends AnySmallRocketButterflyConfig(2, 1)
@@ -346,3 +350,76 @@ class SmallRocketWithGemmini16CoreBusConfig extends AnySmallRocketWithGemmini(16
 class SmallRocketWithGemmini32CoreBusConfig extends AnySmallRocketWithGemmini(32)
 class SmallRocketWithGemmini64CoreBusConfig extends AnySmallRocketWithGemmini(64)
 class SmallRocketWithGemmini128CoreBusConfig extends AnySmallRocketWithGemmini(128)
+
+
+class WithGemminiMeshNoC(nX: Int, nY: Int) extends Config(
+    new constellation.soc.WithSbusNoC({
+        require(nX * nY >= 4, "Mesh is too small!")
+
+        constellation.protocol.TLNoCParams(
+           nodeMappings = constellation.protocol.DiplomaticNetworkNodeMapping(
+                inNodeMapping = ListMap.from(List.tabulate(nX * nY - 3){
+                    i => (s"Core $i " -> i)
+                } ++ List.tabulate(nX * nY - 3) {
+                    i => (s"stream-reader[$i],stream-writer[$i]" -> i)
+                }),
+                outNodeMapping = ListMap(
+                    "system[0]" -> (0 max (nX * nY - 1)), // Memory
+                    "system[1]" -> (0 max (nX * nY - 2)), // MMIO
+                    "pbus" -> (0 max (nX * nY - 3))
+                )
+            ),
+            nocParams = constellation.noc.NoCParams(
+                topology = TerminalRouter(Mesh2D(nX, nY)),
+                channelParamGen = (_, _) => UserChannelParams(
+                    virtualChannelParams = Seq.fill(5) {
+                        UserVirtualChannelParams(4)
+                    },
+                    channelGen = (u) => {
+                        implicit val p: Parameters = u
+                        ChannelBuffer(4) := _
+                    },
+                    useOutputQueues = true // prevent long comb paths between terminal routers
+                ),
+                routingRelation = BlockingVirtualSubnetworksRouting(
+                    f = TerminalRouterRouting(
+                        Mesh2DDimensionOrderedRouting()
+                    ),
+                    n = 5, // RADDR, RDATA, WADDR, WRESP, WDATA for AXI and A-B-C-D-E for TL
+                    nDedicated = 1
+                ),
+                routerParams = _ => UserRouterParams(
+                    payloadBits = 64,
+                    combineSAST = false,
+                    combineRCVA = false,
+                    coupleSAVA = false,
+                ),
+                skipValidationChecks = false,
+            )
+        )
+    }) ++
+    new MinimalSimulationConfig
+)
+
+class AnySmallRocketWithGemminiMeshConfig(nX: Int, nY: Int) extends Config(
+    new GemminiCustomChipConfig ++
+    new freechips.rocketchip.subsystem.WithNSmallCores(n = nX * nY - 3) ++
+    new freechips.rocketchip.subsystem.WithNBanks(n = 1) ++
+    new WithGemminiMeshNoC(nX, nY)
+)
+
+class SmallRocketWithGemmini2x2CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(2, 2)
+class SmallRocketWithGemmini3x3CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(3, 3)
+class SmallRocketWithGemmini4x4CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(4, 4)
+class SmallRocketWithGemmini5x5CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(5, 5)
+class SmallRocketWithGemmini6x6CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(6, 6)
+class SmallRocketWithGemmini7x7CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(7, 7)
+class SmallRocketWithGemmini8x8CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(8, 8)
+class SmallRocketWithGemmini9x9CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(9, 9)
+class SmallRocketWithGemmini10x10CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(10, 10)
+class SmallRocketWithGemmini11x11CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(11, 11)
+class SmallRocketWithGemmini12x12CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(12, 12)
+class SmallRocketWithGemmini13x13CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(13, 13)
+class SmallRocketWithGemmini14x14CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(14, 14)
+class SmallRocketWithGemmini15x15CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(15, 15)
+

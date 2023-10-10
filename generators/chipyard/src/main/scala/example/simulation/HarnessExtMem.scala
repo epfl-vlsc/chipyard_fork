@@ -119,7 +119,7 @@ class WithSimAXIMMIOToHostSnooper(toHostOffset: Int = 0) extends OverrideHarness
 
 
 class WithSimTLMemHexPlusArgs extends OverrideHarnessBinder({
-  (system: CanHaveMasterTLMemPort, th: HasHarnessInstantiators, ports: Seq[HeterogeneousBag[TLBundle]]) => {
+  (system: CanHaveMasterTLMemPort, th: HasHarnessInstantiators, ports: Seq[ClockedAndResetIO[TLBundle]]) => {
     val p: Parameters = chipyard.iobinders.GetSystemParameters(system)
     require(ports.length == 1, "expected exactly one TL memory")
     (ports zip system.memTLNode.edges.in).map { case (port, edge) =>
@@ -132,13 +132,13 @@ class WithSimTLMemHexPlusArgs extends OverrideHarnessBinder({
                     )(p)
                 )
       Module(mem.module).suggestName("mem_tl")
-      mem.io_tl.head <> port.elts.head
+      mem.io_tl.head <> port.bits
     }
   }
 })
 
 class WithSimTLMMIOToHostSnooper(toHostOffset: Int = 0) extends OverrideHarnessBinder({
-  (system: CanHaveCustomMasterTLMMIOPort, th: HasHarnessInstantiators, ports: Seq[HeterogeneousBag[TLBundle]]) => {
+  (system: CanHaveCustomMasterTLMMIOPort, th: HasHarnessInstantiators, ports: Seq[ClockedAndResetIO[TLBundle]]) => {
     val p: Parameters = chipyard.iobinders.GetSystemParameters(system)
     require(ports.length == 1, s"expected exactly one TL MMIO port but have ${ports.length}")
     (ports zip system.mmioTLNode.edges.in).map { case (port, edge) =>
@@ -153,7 +153,7 @@ class WithSimTLMMIOToHostSnooper(toHostOffset: Int = 0) extends OverrideHarnessB
 
       Module(mmio.module).suggestName("mmio_mem_tl")
 
-      mmio.io_tl.head <> port.elts.head
+      mmio.io_tl.head <> port.bits
     }
   }
 })

@@ -1,13 +1,14 @@
-package chipyard.ple.simulation
+package chipyard.example.simulation
 
 import org.chipsalliance.cde.config.{Config}
 import chipyard.example.simulation.SimulationAbstractConfig
+import chipyard.example.simulation.MinimalSimulationConfig
 
 
 
 abstract class AnyShuttleConfig(n: Int) extends Config(
     new shuttle.common.WithNShuttleCores(n = n) ++
-    new SimulationAbstractConfig
+    new MinimalSimulationConfig
 )
 
 

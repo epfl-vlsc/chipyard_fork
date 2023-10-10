@@ -23,8 +23,13 @@ import freechips.rocketchip.devices.tilelink.CLINTKey
 class WithBootROMPrefixPath(prefixPath: String) extends Config((site, here, up) => {
   case freechips.rocketchip.devices.tilelink.BootROMLocated(x) =>
     up(freechips.rocketchip.devices.tilelink.BootROMLocated(x), site)
-      .map(_.copy(contentFileName =
-        s"${prefixPath}/bootrom.rv${site(freechips.rocketchip.tile.XLen)}.img"))
+      .map(_.copy(
+        contentFileName =
+          s"${prefixPath}/bootrom.rv${site(freechips.rocketchip.tile.XLen)}.img",
+        size = 0x20000,
+        hang = 0x100040,
+        address = 0x100000
+      ))
 })
 
 class WithDisableTileClockGating extends Config((site, here, up) => {

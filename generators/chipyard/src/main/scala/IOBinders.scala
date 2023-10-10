@@ -28,6 +28,7 @@ import chipyard.{CanHaveMasterTLMemPort}
 
 import scala.reflect.{ClassTag}
 import chipyard.CanHaveCustomMasterTLMMIOPort
+import chipyard.{ExtTLMem, ExtTLBus}
 
 object IOBinderTypes {
   type IOBinderTuple = (Seq[Data], Seq[IOCell])
@@ -412,20 +413,60 @@ class WithCustomBootPin extends OverrideIOBinder({
   }).getOrElse((Nil, Nil))
 })
 
-class WithTLMemPunchthrough extends OverrideIOBinder({
+
+class WithTLMemPunchthrough extends OverrideLazyIOBinder({
   (system: CanHaveMasterTLMemPort) => {
-    val io_tl_mem_pins_temp = IO(DataMirror.internal.chiselTypeClone[HeterogeneousBag[TLBundle]](system.mem_tl)).suggestName("tl_slave")
-    io_tl_mem_pins_temp <> system.mem_tl
-    (Seq(io_tl_mem_pins_temp), Nil)
+    implicit val p: Parameters = GetSystemParameters(system)
+    val clockSinkNode = p(ExtTLMem).map(_ => ClockSinkNode(Seq(ClockSinkParameters())))
+    clockSinkNode.map(_ := system.asInstanceOf[HasTileLinkLocations].locateTLBusWrapper(MBUS).fixedClockNode)
+    def clockBundle = clockSinkNode.get.in.head._1
+
+    InModuleBody {
+      val ports: Seq[ClockedAndResetIO[TLBundle]] = system.mem_tl.zipWithIndex.map({ case (m, i) =>
+        val p = IO(new ClockedAndResetIO(DataMirror.internal.chiselTypeClone[TLBundle](m))).suggestName(s"tl_mem_${i}")
+        p.bits <> m
+        p.clock := clockBundle.clock
+        p.reset := clockBundle.reset
+        p
+      }).toSeq
+      (ports, Nil)
+    }
   }
 })
-class WithTLMMIOPunchthrough extends OverrideIOBinder({
+
+class WithTLMMIOPunchthrough extends OverrideLazyIOBinder({
   (system: CanHaveCustomMasterTLMMIOPort) => {
-    val io_tl_mem_pins_temp = IO(DataMirror.internal.chiselTypeClone[HeterogeneousBag[TLBundle]](system.mmio_tl)).suggestName("tl_mmio_slave")
-    io_tl_mem_pins_temp <> system.mmio_tl
-    (Seq(io_tl_mem_pins_temp), Nil)
+    implicit val p: Parameters = GetSystemParameters(system)
+    val clockSinkNode = p(ExtTLBus).map(_ => ClockSinkNode(Seq(ClockSinkParameters())))
+    clockSinkNode.map(_ := system.asInstanceOf[HasTileLinkLocations].locateTLBusWrapper(SBUS).fixedClockNode)
+    def clockBundle = clockSinkNode.get.in.head._1
+
+    InModuleBody {
+      val ports: Seq[ClockedAndResetIO[TLBundle]] = system.mmio_tl.zipWithIndex.map({ case (m, i) =>
+        val p = IO(new ClockedAndResetIO(DataMirror.internal.chiselTypeClone[TLBundle](m))).suggestName(s"tl_mmio_${i}")
+        p.bits <> m
+        p.clock := clockBundle.clock
+        p.reset := clockBundle.reset
+        p
+      }).toSeq
+      (ports, Nil)
+    }
   }
 })
+// class WithTLMemPunchthrough extends OverrideIOBinder({
+//   (system: CanHaveMasterTLMemPort) => {
+//     val io_tl_mem_pins_temp = IO(DataMirror.internal.chiselTypeClone[HeterogeneousBag[TLBundle]](system.mem_tl)).suggestName("tl_slave")
+//     io_tl_mem_pins_temp <> system.mem_tl
+//     (Seq(io_tl_mem_pins_temp), Nil)
+//   }
+// })
+// class WithTLMMIOPunchthrough extends OverrideIOBinder({
+//   (system: CanHaveCustomMasterTLMMIOPort) => {
+//     val io_tl_mem_pins_temp = IO(DataMirror.internal.chiselTypeClone[HeterogeneousBag[TLBundle]](system.mmio_tl)).suggestName("tl_mmio_slave")
+//     io_tl_mem_pins_temp <> system.mmio_tl
+//     (Seq(io_tl_mem_pins_temp), Nil)
+//   }
+// })
 
 
 class WithDontTouchPorts extends OverrideIOBinder({
