@@ -38,6 +38,9 @@ import constellation.routing.BidirectionalTorus1DDatelineRouting
 import constellation.topology.Butterfly
 import constellation.routing.ButterflyRouting
 import constellation.channel.ChannelBuffer
+import gemmini.CapacityInKilobytes
+import gemmini.Dataflow
+import gemmini.ScaleArguments
 
 class BaseRocketConfig extends Config(
     new freechips.rocketchip.subsystem.WithSynchronousRocketTiles ++
@@ -308,7 +311,11 @@ class SmallRocket11x11CoreMeshConfig extends AnySmallRocketMeshConfig(11, 11)
 class SmallRocket12x12CoreMeshConfig extends AnySmallRocketMeshConfig(12, 12)
 class SmallRocket13x13CoreMeshConfig extends AnySmallRocketMeshConfig(13, 13)
 class SmallRocket14x14CoreMeshConfig extends AnySmallRocketMeshConfig(14, 14)
-class SmallRocket15x15CoreMeshConfig extends AnySmallRocketMeshConfig(15, 15)
+class SmallRocket16x16CoreMeshConfig extends AnySmallRocketMeshConfig(16, 16)
+class SmallRocket17x17CoreMeshConfig extends AnySmallRocketMeshConfig(17, 17)
+class SmallRocket18x18CoreMeshConfig extends AnySmallRocketMeshConfig(18, 18)
+class SmallRocket19x19CoreMeshConfig extends AnySmallRocketMeshConfig(19, 19)
+class SmallRocket20x20CoreMeshConfig extends AnySmallRocketMeshConfig(20, 20)
 
 
 // class SmallRocket2Ary0FlyCoreButterflyConfig extends AnySmallRocketButterflyConfig(2, 0)
@@ -322,9 +329,59 @@ class SmallRocket2Ary6FlyCoreButterflyConfig extends AnySmallRocketButterflyConf
 class SmallRocket2Ary7FlyCoreButterflyConfig extends AnySmallRocketButterflyConfig(2, 7)
 class SmallRocket2Ary8FlyCoreButterflyConfig extends AnySmallRocketButterflyConfig(2, 8)
 
+// object GemminiConfigs {
+
+//     val large = GemminiConfigs.defaultConfig.copy(
+//         meshRows = 16,
+//         meshColumns = 16,
+//         sp_capacity = CapacityInKilobytes(64),
+//         acc_capacity = CapacityInKilobytes(32),
+//         dataflow = Dataflow.WS,
+//         acc_singleported = true,
+//         acc_sub_banks = 2,
+//         mesh_output_delay = 2,
+//         ex_read_from_acc = false,
+//         ex_write_to_spad = false,
+//         hardcode_d_to_garbage_addr = true,
+//         // disable combinational scaling
+//         mvin_scale_args = Option.empty[ScaleArguments[chisel3.SInt, gemmini.Float]],
+//         mvin_scale_acc_args = Option.empty[ScaleArguments[chisel3.SInt, gemmini.Float]]
+//     )
+//     val small = large.copy(
+//         meshRows = 8
+//     )
+// }
+
+object GemminiCustomConfigs {
+
+
+    val large16x16 =  GemminiConfigs.defaultConfig.copy(
+        meshRows = 16,
+        meshColumns = 16,
+        sp_capacity = CapacityInKilobytes(64),
+        acc_capacity = CapacityInKilobytes(32),
+        dataflow = Dataflow.WS,
+        acc_singleported = true,
+        acc_sub_banks = 2,
+        mesh_output_delay = 2,
+        ex_read_from_acc = false,
+        ex_write_to_spad = false,
+        hardcode_d_to_garbage_addr = true,
+        // disable combinational scaling
+        mvin_scale_args = Option.empty[ScaleArguments[chisel3.SInt, gemmini.Float]],
+        mvin_scale_acc_args = Option.empty[ScaleArguments[chisel3.SInt, gemmini.Float]]
+    )
+
+    val small8x8 = large16x16.copy(
+        meshRows = 8, meshColumns = 8,
+        ld_queue_length = 4,
+        st_queue_length = 2,
+        ex_queue_length = 8
+    )
+}
 
 class GemminiCustomChipConfig[T <: Data : Arithmetic, U <: Data, V <: Data](
-    gemminiConfig: GemminiArrayConfig[T, U, V] = GemminiConfigs.chipConfig
+    gemminiConfig: GemminiArrayConfig[T, U, V] = GemminiCustomConfigs.large16x16
 ) extends Config((site, here, up) => {
     case BuildRoCC => up(BuildRoCC) ++ Seq(
         (p: Parameters) => {
@@ -335,21 +392,6 @@ class GemminiCustomChipConfig[T <: Data : Arithmetic, U <: Data, V <: Data](
     )
 })
 
-abstract class AnySmallRocketWithGemmini(n: Int) extends Config (
-    new GemminiCustomChipConfig ++
-    new freechips.rocketchip.subsystem.WithNSmallCores(n = n) ++
-    new MinimalSimulationConfig
-)
-
-
-class SmallRocketWithGemmini1CoreBusConfig extends AnySmallRocketWithGemmini(1)
-class SmallRocketWithGemmini2CoreBusConfig extends AnySmallRocketWithGemmini(2)
-class SmallRocketWithGemmini4CoreBusConfig extends AnySmallRocketWithGemmini(4)
-class SmallRocketWithGemmini8CoreBusConfig extends AnySmallRocketWithGemmini(8)
-class SmallRocketWithGemmini16CoreBusConfig extends AnySmallRocketWithGemmini(16)
-class SmallRocketWithGemmini32CoreBusConfig extends AnySmallRocketWithGemmini(32)
-class SmallRocketWithGemmini64CoreBusConfig extends AnySmallRocketWithGemmini(64)
-class SmallRocketWithGemmini128CoreBusConfig extends AnySmallRocketWithGemmini(128)
 
 
 class WithGemminiMeshNoC(nX: Int, nY: Int) extends Config(
@@ -408,6 +450,39 @@ class AnySmallRocketWithGemminiMeshConfig(nX: Int, nY: Int) extends Config(
     new WithGemminiMeshNoC(nX, nY)
 )
 
+class AnySmallRocketWithGemminiBusConfig(n: Int) extends Config(
+    new GemminiCustomChipConfig(GemminiCustomConfigs.large16x16) ++
+    new freechips.rocketchip.subsystem.WithNSmallCores(n = n) ++
+    new MinimalSimulationConfig
+)
+
+class AnySmallRocketWithSmallGemminiBusConfig(n: Int) extends Config(
+    new GemminiCustomChipConfig(GemminiCustomConfigs.small8x8) ++
+    new freechips.rocketchip.subsystem.WithNSmallCores(n = n) ++
+    new MinimalSimulationConfig
+)
+
+
+class SmallRocketWithGemmini1CoreBusConfig extends AnySmallRocketWithGemminiBusConfig(1)
+class SmallRocketWithGemmini2CoreBusConfig extends AnySmallRocketWithGemminiBusConfig(2)
+class SmallRocketWithGemmini4CoreBusConfig extends AnySmallRocketWithGemminiBusConfig(4)
+class SmallRocketWithGemmini8CoreBusConfig extends AnySmallRocketWithGemminiBusConfig(8)
+class SmallRocketWithGemmini16CoreBusConfig extends AnySmallRocketWithGemminiBusConfig(16)
+class SmallRocketWithGemmini32CoreBusConfig extends AnySmallRocketWithGemminiBusConfig(32)
+class SmallRocketWithGemmini64CoreBusConfig extends AnySmallRocketWithGemminiBusConfig(64)
+class SmallRocketWithGemmini128CoreBusConfig extends AnySmallRocketWithGemminiBusConfig(128)
+
+
+class SmallRocketWithSmallGemmini1CoreBusConfig extends AnySmallRocketWithSmallGemminiBusConfig(1)
+class SmallRocketWithSmallGemmini2CoreBusConfig extends AnySmallRocketWithSmallGemminiBusConfig(2)
+class SmallRocketWithSmallGemmini4CoreBusConfig extends AnySmallRocketWithSmallGemminiBusConfig(4)
+class SmallRocketWithSmallGemmini8CoreBusConfig extends AnySmallRocketWithSmallGemminiBusConfig(8)
+class SmallRocketWithSmallGemmini16CoreBusConfig extends AnySmallRocketWithSmallGemminiBusConfig(16)
+class SmallRocketWithSmallGemmini32CoreBusConfig extends AnySmallRocketWithSmallGemminiBusConfig(32)
+class SmallRocketWithSmallGemmini64CoreBusConfig extends AnySmallRocketWithSmallGemminiBusConfig(64)
+class SmallRocketWithSmallGemmini128CoreBusConfig extends AnySmallRocketWithSmallGemminiBusConfig(128)
+
+
 class SmallRocketWithGemmini2x2CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(2, 2)
 class SmallRocketWithGemmini3x3CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(3, 3)
 class SmallRocketWithGemmini4x4CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(4, 4)
@@ -422,4 +497,9 @@ class SmallRocketWithGemmini12x12CoreMeshConfig extends AnySmallRocketWithGemmin
 class SmallRocketWithGemmini13x13CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(13, 13)
 class SmallRocketWithGemmini14x14CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(14, 14)
 class SmallRocketWithGemmini15x15CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(15, 15)
+class SmallRocketWithGemmini16x16CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(16, 16)
+class SmallRocketWithGemmini17x17CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(17, 17)
+class SmallRocketWithGemmini18x18CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(18, 18)
+class SmallRocketWithGemmini19x19CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(19, 19)
+class SmallRocketWithGemmini20x20CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(20, 20)
 
