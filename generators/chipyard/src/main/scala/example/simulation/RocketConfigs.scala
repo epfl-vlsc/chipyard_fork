@@ -41,6 +41,13 @@ import constellation.channel.ChannelBuffer
 import gemmini.CapacityInKilobytes
 import gemmini.Dataflow
 import gemmini.ScaleArguments
+import constellation.topology.HierarchicalTopology
+import constellation.topology.BidirectionalLine
+import constellation.topology.HierarchicalSubTopology
+import constellation.routing.HierarchicalRouting
+import constellation.routing.BidirectionalLineRouting
+import constellation.soc.GlobalNoCParams
+import chisel3.util.isPow2
 
 class BaseRocketConfig extends Config(
     new freechips.rocketchip.subsystem.WithSynchronousRocketTiles ++
@@ -226,7 +233,7 @@ class WithButterflyNoC(kAry: Int, nFly: Int) extends Config ({
                     f = TerminalRouterRouting(
                         ButterflyRouting()
                     ),
-                    n = 5, // RADDR, RDATA, WADDR, WRESP, WDATA
+                    n = 10, // RADDR, RDATA, WADDR, WRESP, WDATA
                     nDedicated = 3
                 ),
                 skipValidationChecks = false,
@@ -580,5 +587,190 @@ class SmallRocketWithGemmini18x18CoreMeshConfig extends AnySmallRocketWithGemmin
 class SmallRocketWithGemmini19x19CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(19, 19)
 class SmallRocketWithGemmini20x20CoreMeshConfig extends AnySmallRocketWithGemminiMeshConfig(20, 20)
 
+
+
+
+class WithBankedDualMeshNoC(nX: Int, nY: Int, crossHops: Int = 5) extends Config({
+    require(crossHops >= 3, "at least three hops needed")
+    val topology = TerminalRouter(
+            HierarchicalTopology(
+                base = BidirectionalLine(crossHops),
+                children = Seq(
+                    HierarchicalSubTopology(0, 0, Mesh2D(nX, nY)),
+                    HierarchicalSubTopology(crossHops - 1, 0, Mesh2D(nX, nY))
+                )
+            )
+        )
+    val routing = BlockingVirtualSubnetworksRouting(
+        f = TerminalRouterRouting(
+            HierarchicalRouting(
+                baseRouting = BidirectionalLineRouting(),
+                childRouting = Seq.fill(2) {
+                    Mesh2DDimensionOrderedRouting()
+                }
+            )
+        ),
+        n = 5, // RADDR, RDATA, WADDR, WRESP, WDATA for AXI and A-B-C-D-E for TL
+        nDedicated = 1
+    )
+    val nocParams = constellation.noc.NoCParams(
+            topology = topology,
+            routingRelation = routing,
+            channelParamGen = (_, _) => UserChannelParams(
+                virtualChannelParams = Seq.fill(5) {
+                    UserVirtualChannelParams(4)
+                },
+                channelGen = (u) => {
+                    implicit val p: Parameters = u
+                    ChannelBuffer(4) := _
+                },
+                useOutputQueues = true // prevent long comb paths between terminal routers
+            ),
+            routerParams = _ => UserRouterParams(
+                payloadBits = 64,
+                combineSAST = false,
+                combineRCVA = false,
+                coupleSAVA = false,
+            ),
+            skipValidationChecks = true, // takes forever to check
+        )
+    def coreMapping(offset: Int) = ListMap.from(List.tabulate(nX * nY){
+                    i => (s"Core ${i + offset} " -> (i + offset + crossHops))
+    })
+    def linMapping(name: String, offset: Int) = ListMap.from(
+        List.tabulate(nX * nY) {
+            i => s"${name}[${i + offset}]" -> (i + offset + crossHops)
+        }
+    )
+    new constellation.soc.WithSbusNoC(
+        tlnocParams = constellation.protocol.TLNoCParams(
+            nodeMappings = constellation.protocol.DiplomaticNetworkNodeMapping(
+                inNodeMapping = coreMapping(0) ++ coreMapping(nX * nY),
+                outNodeMapping = ListMap(
+                    "pbus" -> 1,
+                    s"system[${2 * nX * nY}]" -> 0 // MMIO
+                ) ++ linMapping("system", 0) ++ linMapping("system", nX * nY)
+            ),
+            nocParams = nocParams
+        )
+    ) ++
+    new constellation.soc.WithMbusNoC(
+        tlnocParams = constellation.protocol.TLNoCParams(
+            nodeMappings = constellation.protocol.DiplomaticNetworkNodeMapping(
+                inNodeMapping = linMapping("Cache", 0) ++ linMapping("Cache", nX * nY),
+                outNodeMapping = linMapping("system", 0) ++ linMapping("system", nX * nY)
+            ),
+            nocParams = nocParams
+        )
+    ) ++
+    new freechips.rocketchip.subsystem.WithInclusiveCache(capacityKB = 64 * 2 * nX * nY) ++  // use Sifive L2 cache, 64 KiB per core
+    new freechips.rocketchip.subsystem.WithNBanks(n = 2 * nX * nY) ++
+    new MinimalSimulationConfig
+})
+
+
+class AnySmallRocketDualMeshConfig(nX: Int, nY: Int) extends Config(
+    new freechips.rocketchip.subsystem.WithNBigCores(n = 2 * nX * nY) ++
+    new WithBankedDualMeshNoC(nX, nY)
+)
+
+
+class SmallRocket2x2CoreDualMeshConfig extends AnySmallRocketDualMeshConfig(2, 2)
+class SmallRocket4x4CoreDualMeshConfig extends AnySmallRocketDualMeshConfig(4, 4)
+class SmallRocket8x8CoreDualMeshConfig extends AnySmallRocketDualMeshConfig(8, 8)
+
+
+class WithBankedMeshNoC(nX: Int, nY: Int) extends Config({
+    require(isPow2(nX * nY))
+    val nocParams = constellation.noc.NoCParams(
+        topology = TerminalRouter(Mesh2D(nX, nY)),
+        channelParamGen = (_, _) => UserChannelParams(
+            virtualChannelParams = Seq.fill(5) {
+                UserVirtualChannelParams(4)
+            },
+            channelGen = (u) => {
+                implicit val p: Parameters = u
+                ChannelBuffer(4) := _
+            },
+            useOutputQueues = true // prevent long comb paths between terminal routers
+        ),
+        routingRelation = BlockingVirtualSubnetworksRouting(
+            f = TerminalRouterRouting(
+                Mesh2DDimensionOrderedRouting()
+            ),
+            n = 5, // RADDR, RDATA, WADDR, WRESP, WDATA for AXI and A-B-C-D-E for TL
+            nDedicated = 1
+        ),
+        routerParams = _ => UserRouterParams(
+            payloadBits = 64,
+            combineSAST = false,
+            combineRCVA = false,
+            coupleSAVA = false,
+        ),
+        skipValidationChecks = false,
+    )
+
+    def linMapping(name: String) = ListMap.from(
+        List.tabulate(nX * nY) {
+            i => s"${name}[${i}]" -> i
+        }
+    )
+    new constellation.soc.WithSbusNoC(
+        tlnocParams = constellation.protocol.TLNoCParams(
+            nodeMappings = constellation.protocol.DiplomaticNetworkNodeMapping(
+                inNodeMapping = ListMap.from(List.tabulate(nX * nY) { i => (s"Core ${i} " -> i)}),
+                outNodeMapping = ListMap(
+                    "pbus" -> 1,
+                    s"system[${nX * nY}]" -> (nX * nY - 1) // MMIO
+                ) ++ linMapping("system") // L2
+            ),
+            nocParams = nocParams
+        )
+    ) ++
+    new constellation.soc.WithMbusNoC(
+        tlnocParams = constellation.protocol.TLNoCParams(
+            nodeMappings = constellation.protocol.DiplomaticNetworkNodeMapping(
+                inNodeMapping = linMapping("Cache"),
+                outNodeMapping = linMapping("system")
+            ),
+            nocParams = nocParams
+        )
+    ) ++
+    new freechips.rocketchip.subsystem.WithInclusiveCache(capacityKB = 16 * nX * nY) ++  // use Sifive L2 cache, 16 KiB per core
+    new freechips.rocketchip.subsystem.WithNBanks(n = nX * nY) ++
+    new MinimalSimulationConfig
+})
+
+class AnyBigRocketBankedMeshConfig(nX: Int, nY: Int) extends Config(
+    new freechips.rocketchip.subsystem.WithNBigCores(n = nX * nY) ++
+    new WithBankedMeshNoC(nX, nY)
+)
+
+class AnySmallRocketBankedMeshConfig(nX: Int, nY: Int) extends Config(
+    new freechips.rocketchip.subsystem.WithNSmallCores(n = nX * nY) ++
+    new WithBankedMeshNoC(nX, nY)
+)
+
+
+
+class BigRocket1x2CoreBankedMeshConfig extends AnyBigRocketBankedMeshConfig(1, 2)
+class BigRocket2x2CoreBankedMeshConfig extends AnyBigRocketBankedMeshConfig(2, 2)
+class BigRocket2x4CoreBankedMeshConfig extends AnyBigRocketBankedMeshConfig(2, 4)
+class BigRocket4x4CoreBankedMeshConfig extends AnyBigRocketBankedMeshConfig(4, 4)
+class BigRocket4x8CoreBankedMeshConfig extends AnyBigRocketBankedMeshConfig(4, 8)
+class BigRocket8x8CoreBankedMeshConfig extends AnyBigRocketBankedMeshConfig(8, 8)
+class BigRocket8x16CoreBankedMeshConfig extends AnyBigRocketBankedMeshConfig(8, 16)
+class BigRocket16x16CoreBankedMeshConfig extends AnyBigRocketBankedMeshConfig(16, 16)
+
+
+
+class SmallRocket1x2CoreBankedMeshConfig extends AnySmallRocketBankedMeshConfig(1, 2)
+class SmallRocket2x2CoreBankedMeshConfig extends AnySmallRocketBankedMeshConfig(2, 2)
+class SmallRocket2x4CoreBankedMeshConfig extends AnySmallRocketBankedMeshConfig(2, 4)
+class SmallRocket4x4CoreBankedMeshConfig extends AnySmallRocketBankedMeshConfig(4, 4)
+class SmallRocket4x8CoreBankedMeshConfig extends AnySmallRocketBankedMeshConfig(4, 8)
+class SmallRocket8x8CoreBankedMeshConfig extends AnySmallRocketBankedMeshConfig(8, 8)
+class SmallRocket8x16CoreBankedMeshConfig extends AnySmallRocketBankedMeshConfig(8, 16)
+class SmallRocket16x16CoreBankedMeshConfig extends AnySmallRocketBankedMeshConfig(16, 16)
 
 
