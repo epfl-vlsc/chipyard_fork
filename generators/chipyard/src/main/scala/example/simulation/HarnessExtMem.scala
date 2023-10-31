@@ -74,6 +74,14 @@ import freechips.rocketchip.tilelink.HasTLControlRegMap
 import freechips.rocketchip.subsystem.BaseSubsystem
 import freechips.rocketchip.subsystem
 
+
+case class SimMemorySizeParam(size: BigInt)
+case object ExtSimMemSize extends Field[Option[SimMemorySizeParam]]
+
+class WithExtSimMemSize(size: BigInt) extends Config((site, here, up) => {
+  case ExtSimMemSize => Some(SimMemorySizeParam(size))
+})
+
 class WithExtTLMemSize(n: BigInt) extends Config((site, here, up) => {
   case ExtTLMem => up(ExtTLMem, site).map(x => x.copy(master = x.master.copy(size = n)))
 })
@@ -84,7 +92,7 @@ class WithSimAXIMemHexPlusArgs extends OverrideHarnessBinder({
     (ports zip system.memAXI4Node.edges.in).map { case (port, edge) =>
       val mem = LazyModule(
                     new SimAXIMemGen(edge,
-                        size = p(ExtMem).get.master.size,
+                        size = p(ExtSimMemSize).get.size, // do not use the ExtMem
                         base = p(ExtMem).get.master.base,
                         memoryGen =
                           (lanes, bits, size) => Module(new SimRAMLoadHex(lanes = lanes, bits = bits, size = size))
@@ -125,7 +133,7 @@ class WithSimTLMemHexPlusArgs extends OverrideHarnessBinder({
     (ports zip system.memTLNode.edges.in).map { case (port, edge) =>
       val mem = LazyModule(
                     new SimTLMemGen(edge,
-                        size = p(ExtTLMem).get.master.size,
+                        size = p(ExtSimMemSize).get.size, // do not use the ExtMem
                         base = p(ExtTLMem).get.master.base,
                         memoryGen =
                           (lanes, bits, size) => Module(new SimRAMLoadHex(lanes = lanes, bits = bits, size = size))
