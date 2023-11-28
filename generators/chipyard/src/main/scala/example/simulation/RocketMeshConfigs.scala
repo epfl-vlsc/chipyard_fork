@@ -106,6 +106,12 @@ class AnySmallRocketMultiMeshConfig(nX: Int, nY: Int, mX: Int, mY: Int) extends 
     new WithMultiMeshNoC(nX, nY, mX, mY)
 )
 
+class AnyBigRocketMultiMeshConfig(nX: Int, nY: Int, mX: Int, mY: Int) extends Config(
+    new freechips.rocketchip.subsystem.WithNBigCores(n = mX * mY * nX * nY) ++
+    new WithMultiMeshNoC(nX, nY, mX, mY)
+)
+
+
 
 
 
@@ -128,9 +134,14 @@ class SmallRocket4x4Core2x2MeshConfig extends AnySmallRocketMultiMeshConfig(4, 4
 class SmallRocket5x5Core2x2MeshConfig extends AnySmallRocketMultiMeshConfig(5, 5, 2, 2)
 class SmallRocket6x6Core2x2MeshConfig extends AnySmallRocketMultiMeshConfig(6, 6, 2, 2)
 class SmallRocket7x7Core2x2MeshConfig extends AnySmallRocketMultiMeshConfig(7, 7, 2, 2)
-class SmallRocket8x8Core2x2MeshConfig extends AnySmallRocketMultiMeshConfig(8, 8, 2, 2)
-class SmallRocket9x9Core2x2MeshConfig extends AnySmallRocketMultiMeshConfig(9, 9, 2, 2)
-class SmallRocket10x10Core2x2MeshConfig extends AnySmallRocketMultiMeshConfig(10, 10, 2, 2)
+
+
+class BigRocket2x2Core2x2MeshConfig extends AnyBigRocketMultiMeshConfig(2, 2, 2, 2)
+class BigRocket3x3Core2x2MeshConfig extends AnyBigRocketMultiMeshConfig(3, 3, 2, 2)
+class BigRocket4x4Core2x2MeshConfig extends AnyBigRocketMultiMeshConfig(4, 4, 2, 2)
+class BigRocket5x5Core2x2MeshConfig extends AnyBigRocketMultiMeshConfig(5, 5, 2, 2)
+class BigRocket6x6Core2x2MeshConfig extends AnyBigRocketMultiMeshConfig(6, 6, 2, 2)
+class BigRocket7x7Core2x2MeshConfig extends AnyBigRocketMultiMeshConfig(7, 7, 2, 2)
 
 
 

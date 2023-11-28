@@ -27,25 +27,29 @@ for cores in 6; do
     addConfig LargeRocket${cores}CoreBusConfig
 done
 
-# rocket flat mesh
-for cores in 2 3 4 5 6 7 8 9 10 11 12 14 14 15; do
-    addConfig SmallRocket${cores}x${cores}MeshConfig
-done
-for cores in 2 3 4 5 6 7 8 9 10; do
-    addConfig LargeRocket${cores}x${cores}MeshConfig
-done
+# # rocket flat mesh
+# for cores in 2 3 4 5 6 7 8 9 10 11 12 14 14 15; do
+#     addConfig SmallRocket${cores}x${cores}MeshConfig
+# done
+# for cores in 2 3 4 5 6 7 8 9 10; do
+#     addConfig BigRocket${cores}x${cores}CoreMeshConfig
+# done
 
 # hierarchical mesh, rocket only
-for cores in 2 3 4 5 6 7 8 9 10; do
-    addConfig SmallRocket${cores}x${cores}Core2x1MeshConfig
-    addConfig SmallRocket${cores}x${cores}Core2x2MeshConfig
+# for cores in 2 3 4 5 6 7 8 9 10; do
+#     addConfig SmallRocket${cores}x${cores}Core2x1MeshConfig
+# done
+
+for cores in 2 3 4 5 6 7; do
+    # addConfig SmallRocket${cores}x${cores}Core2x2MeshConfig
+    addConfig BigRocket${cores}x${cores}Core2x2MeshConfig
 done
 
 # boom flat mesh
-for cores in 2 3 4 5 6 7 8; do
-    addConfig SmallBoom${cores}x${cores}CoreMeshConfig
-    addConfig LargeBoom${cores}x${cores}CoreMeshConfig
-done
+# for cores in 2 3 4 5 6 7; do
+#     addConfig SmallBoom${cores}x${cores}CoreMeshConfig
+#     addConfig LargeBoom${cores}x${cores}CoreMeshConfig
+# done
 
 
 # initialize a semaphore with a given number of tokens
